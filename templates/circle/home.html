@@ -1,0 +1,116 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2e9">
+  <title>Choice Circle</title>
+  <link rel="stylesheet" href="{% static 'circle/styles.css' %}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="{% url 'circle:home' %}" aria-label="Choice Circle home"><span class="wordmark-heart">&hearts;</span> choice circle</a>
+    <a class="admin-link" href="{% url 'admin:index' %}">Admin <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">A little moment between us</p>
+      <h1 id="page-title">Choose with<br><em>&hearts;.</em></h1>
+      <p class="intro-copy">Enter your name and the circle will choose one person for you.</p>
+    </section>
+
+    <div class="workspace">
+      <section class="choose-panel" aria-labelledby="choose-title">
+        <div class="section-heading">
+          <span class="step">01</span>
+          <h2 id="choose-title">Make your choice</h2>
+        </div>
+        {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+        {% if saved_choice %}
+          <div class="reveal {% if reveal_seconds %}is-revealing{% endif %} {% if should_spin %}is-spinning{% endif %}" id="reveal" data-seconds="{{ reveal_seconds }}">
+            {% if should_spin %}
+            <div class="wheel-stage" id="wheel-stage" role="status" aria-live="polite">
+              <span class="wheel-pointer" aria-hidden="true">&hearts;</span>
+              <div class="choice-wheel" aria-hidden="true"><span>&hearts;</span></div>
+              <p>Drawing your person...</p>
+            </div>
+            {% endif %}
+            <div class="reveal-result">
+              <span class="reveal-heart" aria-hidden="true">&hearts;</span>
+              <p class="reveal-label">Your choice</p>
+              <h2 class="reveal-name">{{ saved_choice.selected.name }}</h2>
+              <p class="reveal-caption">A name held in the circle.</p>
+              <p class="timer" id="timer" aria-live="polite">{% if reveal_seconds %}A moment just for you · <span id="seconds">{{ reveal_seconds }}</span>s{% else %}Your choice is saved{% endif %}</p>
+            </div>
+          </div>
+          <div class="name-lock">
+            <span>Your name</span>
+            <strong>{{ chooser.name }}</strong>
+            <span>This browser is locked to this name.</span>
+          </div>
+        {% else %}
+          <form method="post" action="{% url 'circle:home' %}" class="choice-form">
+            {% csrf_token %}
+            <label for="chooser">Enter your name</label>
+            <input id="chooser" type="text" name="chooser" value="{{ name_input }}" maxlength="80" autocomplete="off" required>
+            <button class="submit-button" type="submit">Select for me <span aria-hidden="true">&hearts;</span></button>
+          </form>
+        {% endif %}
+      </section>
+
+      <aside class="roster" aria-labelledby="roster-title">
+        <div class="section-heading roster-heading">
+          <span class="step">02</span>
+          <h2 id="roster-title">The circle <span>{{ participants|length }}</span></h2>
+        </div>
+        <ul class="participant-list">
+          {% for person in participants %}
+            <li class="participant-row">
+              <span class="participant-name">{{ person.name }}</span>
+            </li>
+          {% empty %}
+            <li class="empty-row">No participants have been added yet.</li>
+          {% endfor %}
+        </ul>
+        <p class="roster-foot">One choice per name. One choice for each person.</p>
+      </aside>
+    </div>
+  </main>
+
+  <footer><span>Keep it kind.</span><span>Choice Circle <span aria-hidden="true">&hearts;</span></span></footer>
+  {% if reveal_seconds or should_spin %}
+  <script>
+    (() => {
+      const reveal = document.getElementById('reveal');
+      const wheel = document.getElementById('wheel-stage');
+      if (wheel) {
+        wheel.addEventListener('animationend', (event) => {
+          if (event.target === wheel) {
+            reveal.classList.remove('is-spinning');
+            reveal.classList.add('spin-complete');
+          }
+        }, { once: true });
+      }
+      {% if reveal_seconds %}
+      const counter = document.getElementById('seconds');
+      let remaining = Number(reveal.dataset.seconds);
+      const tick = () => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          reveal.classList.remove('is-revealing');
+          document.getElementById('timer').textContent = 'Your choice is saved';
+          return;
+        }
+        counter.textContent = remaining;
+        window.setTimeout(tick, 1000);
+      };
+      window.setTimeout(tick, 1000);
+      {% endif %}
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>
