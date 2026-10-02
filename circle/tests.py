@@ -1,6 +1,8 @@
+import os
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.db import IntegrityError, transaction
+from django.core.management import call_command
 from unittest.mock import patch
 
 from .models import Choice, Participant
@@ -94,6 +96,22 @@ class ChoiceCircleTests(TestCase):
 				Choice.objects.create(chooser=self.people['Benitha'], selected=self.people['Dosite'])
 
 		self.assertEqual(Choice.objects.filter(selected=self.people['Dosite']).count(), 1)
+
+	@patch.dict(os.environ, {'ADMIN_PASSWORD': 'test-admin-password', 'ADMIN_USERNAME': 'admin'})
+	def test_admin_bootstrap_creates_admin_without_resetting_existing_password(self):
+		from django.contrib.auth import get_user_model
+
+		call_command('bootstrap_admin', verbosity=0)
+		admin_user = get_user_model().objects.get(username='admin')
+		self.assertTrue(admin_user.is_staff)
+		self.assertTrue(admin_user.is_superuser)
+		self.assertTrue(admin_user.check_password('test-admin-password'))
+
+		admin_user.set_password('manually-changed-password')
+		admin_user.save(update_fields=['password'])
+		call_command('bootstrap_admin', verbosity=0)
+		admin_user.refresh_from_db()
+		self.assertTrue(admin_user.check_password('manually-changed-password'))
 
 	def test_saved_choice_can_be_looked_up_again(self):
 		Choice.objects.create(chooser=self.people['Gilbert'], selected=self.people['Dosite'])
